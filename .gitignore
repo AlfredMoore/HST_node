@@ -1,0 +1,11 @@
+*/__pycache__
+**/.venv
+# **/poetry.lock
+**/*.pt
+**/*.bag
+**/bagfiles
+**/.pkl
+**/data
+**/.vscode
+**/**.ipynb
+**/tests
