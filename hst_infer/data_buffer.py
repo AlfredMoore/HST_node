@@ -48,6 +48,12 @@ class skeleton_buffer():
     def get_data_array(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         read the buffer and return keypoints_ATKD, human_center_ATD, keypoint_mask_ATK
+        
+        keypoints_ATKD: (A, T, K, D)
+        human_center_ATD: (A, T, D)
+        keypoint_mask_ATK: (A, T, K)
+
+        A: agents, T: time, K: keypoints, D: dimensions
         """
 
         msg_seq: list[tuple[list[HumanSkeleton], set[int]]] = list(self.buffer)

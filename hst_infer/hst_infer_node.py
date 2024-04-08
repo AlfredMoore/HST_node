@@ -46,11 +46,18 @@ class HST_infer_node(Node):
         self.skeleton_databuffer = skeleton_buffer()
 
         # Subscriber #######################################
-        
+        ### human skeleton msg 
         self._skeleton_sub = self.create_subscription(
             MultiHumanSkeleton, MULTI_HUMAN_SKELETON_TOPIC, self._skeleton_callback, 5
         )
-        
+        ### tf2
+
+
+
+
+
+
+
         logger.info(
             f"Node Name: {HST_INFER_NODE} \n \
             receive message from {MULTI_HUMAN_SKELETON_TOPIC} \n \
@@ -81,12 +88,8 @@ class HST_infer_node(Node):
 
 
 
-    def tf2_transformation(self, pc: np.ndarray, source_frame: str, target_frame: str) -> np.ndarray:
-        assert Exception, "Not implemented function"
 
-
-    def math_transformation(self, pc: np.ndarray, source_coor: np.ndarray, target_coor: np.ndarray) -> np.ndarray:
-        pass
+        
 
 
 def main(args=None):
