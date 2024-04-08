@@ -6,6 +6,7 @@ from geometry_msgs.msg import PoseArray, Pose, Quaternion, Point, Point32, Point
 
 from skeleton_interfaces.msg import MultiHumanSkeleton, HumanSkeleton
 from hst_infer.utils import skeleton2msg
+from hst_infer.utils.logger import logger
 
 KEYPOINT_NUM = 17
 DIM_XYZ = 3
@@ -28,6 +29,7 @@ class skeleton_buffer():
         if non-exsiting skeleton, put (list(),set()) into buffer
         """
         header = data.header
+
         multihuman_data: list[HumanSkeleton] = data.multi_human_skeleton
         multihumanID_set = set()
 
@@ -50,9 +52,9 @@ class skeleton_buffer():
 
         msg_seq: list[tuple[list[HumanSkeleton], set[int]]] = list(self.buffer)
         
-        keypoints_ATKD: np.ndarray = np.zeros(MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM, DIM_XYZ)
-        center_ATD: np.ndarray = np.zeros(MAX_AGENT_NUM, self.maxlen, DIM_XYZ)
-        mask_ATK: np.ndarray = np.zeros(MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM)
+        keypoints_ATKD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM, DIM_XYZ))
+        center_ATD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, DIM_XYZ))
+        mask_ATK: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM), dtype=bool)
 
         # TODO: convert msg into array, put the array in the large array
         # x x x x m m m 
@@ -89,3 +91,7 @@ class skeleton_buffer():
                 center_ATD[a_idx, t_idx, :] = geo_center
         
         return keypoints_ATKD, center_ATD, mask_ATK
+
+
+    def __len__(self):
+        return len(self.buffer)
