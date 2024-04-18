@@ -7,18 +7,21 @@ from geometry_msgs.msg import PoseArray, Pose, Quaternion, Point, Point32, Point
 from skeleton_interfaces.msg import MultiHumanSkeleton, HumanSkeleton
 from hst_infer.utils import skeleton2msg
 from hst_infer.utils.logger import logger
-
-KEYPOINT_NUM = 17
-DIM_XYZ = 3
-MAX_AGENT_NUM = 19
+from hst_infer.node_config import *
+from hst_infer.human_scene_transformer.config import hst_config
 
 class skeleton_buffer():
-    def __init__(self, maxlen:int = 12):
+    def __init__(self, 
+                 history_len:int = hst_config.hst_model_param.num_history_steps,
+                 window_len: int = hst_config.hst_model_param.num_steps,
+                 ):
         
-        self.maxlen = maxlen
-        self.buffer: deque[tuple[list[HumanSkeleton], set[int]]] = deque(maxlen=maxlen)
+        self.maxlen = history_len + 1   # history + presence
+        self.present_idx = history_len + 1
+        self.buffer: deque[tuple[list[HumanSkeleton], set[int]]] = deque(maxlen=self.maxlen)
         self.existing_id = dict()       # dict [ id: index ]
-
+        self.window_len = window_len
+        self.humanID_in_window: list[int] = list()
         # self.empty: bool = True
         # self.full: bool = False
 
@@ -45,6 +48,17 @@ class skeleton_buffer():
             return
 
 
+    def get_current_multihumanID_set(self):
+        """
+        return a set of current human ID
+        """
+        if len(self.buffer) != 0:
+            multihumanID_set = self.buffer[-1] [1]
+        else:
+            multihumanID_set = None
+        return multihumanID_set
+
+
     def get_data_array(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         read the buffer and return keypoints_ATKD, human_center_ATD, keypoint_mask_ATK
@@ -58,9 +72,9 @@ class skeleton_buffer():
 
         msg_seq: list[tuple[list[HumanSkeleton], set[int]]] = list(self.buffer)
         
-        keypoints_ATKD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM, DIM_XYZ))
-        center_ATD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, DIM_XYZ))
-        mask_ATK: np.ndarray = np.zeros((MAX_AGENT_NUM, self.maxlen, KEYPOINT_NUM), dtype=bool)
+        keypoints_ATKD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.window_len, KEYPOINT_NUM, DIM_XYZ))
+        center_ATD: np.ndarray = np.zeros((MAX_AGENT_NUM, self.window_len, DIM_XYZ))
+        mask_ATK: np.ndarray = np.zeros((MAX_AGENT_NUM, self.window_len, KEYPOINT_NUM), dtype=bool)
 
         # TODO: convert msg into array, put the array in the large array
         # x x x x m m m 
@@ -85,19 +99,39 @@ class skeleton_buffer():
             for human_data in multihuman_data:
                 id = human_data.human_id
                 a_idx = id2idx[id]
-                geo_center = skeleton2msg.point32_to_np_vector(human_data.human_center) 
-                keypoint_list: list[Point32] = human_data.keypoint_data
+                geo_center = skeleton2msg.point_to_np_vector(human_data.human_center) 
+                keypoint_list: list[Point] = human_data.keypoint_data
 
                 for k_idx in range(KEYPOINT_NUM):
-                    keypoint_vector = skeleton2msg.point32_to_np_vector(keypoint_list[k_idx])
+                    keypoint_vector = skeleton2msg.point_to_np_vector(keypoint_list[k_idx])
                     
                     keypoints_ATKD[a_idx, t_idx, k_idx, :] = keypoint_vector
                     mask_ATK[a_idx, t_idx, k_idx] = human_data.keypoint_mask[k_idx]
 
                 center_ATD[a_idx, t_idx, :] = geo_center
         
+        # buffer global attributes
+        self.humanID_in_window = allhuamnID_list
+        self.id2idx_in_window = id2idx
+
         return keypoints_ATKD, center_ATD, mask_ATK
 
 
     def __len__(self):
         return len(self.buffer)
+    
+
+
+def skeleton_arrays_to_dict(keypoints_ATKD: np.ndarray, 
+                            position_ATD: np.ndarray, 
+                            keypoint_mask_ATK: np.ndarray, 
+                            robot_position: np.ndarray) -> dict:
+    """
+    convert arrays into hst data structure
+    """
+
+
+    # TODO: 17 keypoints to 33 keypoints
+    # TODO: put agent keypoints on orgin
+
+    # TODO: 'agent/orientation' should be [1, T, 1] np.nan because it is not in the feature

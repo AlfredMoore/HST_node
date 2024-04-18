@@ -1,4 +1,3 @@
-# from . import human_scene_transformer, utils
 """hst_infer API."""
 
 # A new PyPI release will be pushed everytime `__version__` is increased

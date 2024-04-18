@@ -38,11 +38,11 @@ def keypoints_to_skeleton_interfaces(
         keypoint_data_array = keypoints_3d[idx,...]         # [K,3]
         keypoint_mask_array = keypoints_mask[idx,...]       # [K,]
 
-        human_center = np_vector_to_point32(human_center_array)
+        human_center = np_vector_to_point(human_center_array)
 
         keypoint_data = list()
         for keypoint_vector in keypoint_data_array:
-            keypoint_data.append( np_vector_to_point32(keypoint_vector) )
+            keypoint_data.append( np_vector_to_point(keypoint_vector) )
 
         keypoint_mask = keypoint_mask_array.tolist()
 
@@ -58,13 +58,13 @@ def keypoints_to_skeleton_interfaces(
 
 # def dict_to_skeleton_interfaces(human_dict: dict):
 
-def np_vector_to_point32(vector: np.ndarray) -> Point32:
+def np_vector_to_point(vector: np.ndarray) -> Point:
     """
-    numpy vector (3,) to Points32
+    numpy vector (3,) to Points
     """
     
     assert vector.shape == (3,), "the shape of vector must be (3,)"
-    point = Point32()
+    point = Point()
     vector_list = vector.tolist()
     point.x = float(vector_list[0])
     point.y = float(vector_list[1])
@@ -73,9 +73,9 @@ def np_vector_to_point32(vector: np.ndarray) -> Point32:
     return point
 
 
-def point32_to_np_vector(point: Point32) -> np.ndarray:
+def point_to_np_vector(point: Point) -> np.ndarray:
     """
-    Point32 to numpy vector (3,)
+    Point to numpy vector (3,)
     """
     
     point_list = [point.x, point.y, point.z]

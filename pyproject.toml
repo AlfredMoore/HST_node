@@ -14,10 +14,10 @@ priority = "primary"
 # url = "https://download.pytorch.org/whl/cpu"
 # priority = "supplemental"
 
-[[tool.poetry.source]]
-name = "PyTorch CUDA 11.8"
-url = "https://download.pytorch.org/whl/cu118"
-priority = "supplemental"
+# [[tool.poetry.source]]
+# name = "PyTorch CUDA 11.8"
+# url = "https://download.pytorch.org/whl/cu118"
+# priority = "supplemental"
 
 [tool.poetry.dependencies]
 python = "~3.10"
@@ -54,7 +54,7 @@ absl-py = "^1.4"
 gin-config = "^0.5"
 open3d = "^0.17"
 
-tensorflow = "^2.13"
+tensorflow = "~2.14"
 tensorflow-io-gcs-filesystem = "^0.23.0"
 tensorflow-datasets = "^4.9"
 tensorflow-graphics = "^2021.12"
