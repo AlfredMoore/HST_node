@@ -20,7 +20,7 @@ add_custom_target(
 )
 
 install(
-    DIRECTORY launch
+    DIRECTORY launch rviz2
     DESTINATION share/${PROJECT_NAME}/
 )
 

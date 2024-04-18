@@ -19,6 +19,7 @@ RVIZ_HST_TOPIC = HST_INFER_NODE + "/vis/human_trajectory"
 # hst parameters
 WINDOW_LENGTH = 19
 HISTORY_LENGTH = 6
+PREDICTION_MODES_NUM = 6
 
 KEYPOINT_NUM = 17
 DIM_XYZ = 3

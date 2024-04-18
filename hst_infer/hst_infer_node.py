@@ -50,7 +50,7 @@ class HST_infer_node(Node):
                  ):
         
         super().__init__(HST_INFER_NODE)
-        self.skeleton_databuffer = skeleton_buffer(maxlen=hst_config.hst_model_param.num_history_steps)
+        self.skeleton_databuffer = skeleton_buffer(history_len=hst_config.hst_model_param.num_history_steps)
 
         # Subscriber #######################################
         ### human skeleton msg 
@@ -78,9 +78,9 @@ class HST_infer_node(Node):
             f"\nNode Name: {HST_INFER_NODE} \n \
             receive message from {MULTI_HUMAN_SKELETON_TOPIC} \n \
             HST checkpoint: {_checkpoint_path} \n \
-            GPU: { len(tf.config.list_physical_devices('GPU')) } \
+            GPU: {tf.config.list_physical_devices('GPU')} \
+            Tensorflow Eager Mode: {tf.executing_eagerly()} \
         ")
-        logger.debug(f"tensorflow eager mode: {tf.executing_eagerly()}")
         
     
     def _skeleton_callback(self, msg: MultiHumanSkeleton):
@@ -161,18 +161,21 @@ class HST_infer_node(Node):
             # window_humanID_list = self.skeleton_databuffer.humanID_in_window
 
             if RVIZ_HST:
-                multi_human_pos_ATD = np.squeeze(agent_position_pred, axis=0)       # remove batch 1
+                multi_human_pos_ATMD = np.squeeze(agent_position_pred, axis=0)       # remove batch 1
                 multi_human_mask_AT = np.any(keypoint_mask_ATK, axis=-1)
+                # logger.debug(f"{multi_human_pos_ATMD.shape}")
+                assert multi_human_pos_ATMD.shape == (A,T,hst_config.hst_model_param.num_modes,2), \
+                    f"human position shape {multi_human_pos_ATMD.shape} should be {(A,T,hst_config.hst_model_param.num_modes,99)}"
                 assert multi_human_mask_AT.shape == (A,T)
 
                 marker = add_multihuman_pos_markers(
-                    multi_human_pos_ATD=multi_human_pos_ATD,
+                    multi_human_pos_ATMD=multi_human_pos_ATMD,
                     multi_human_mask_AT=multi_human_mask_AT,
                     present_idx=HISTORY_LENGTH,
                     frame_id=STRETCH_BASE_FRAME,
                     ns=HST_INFER_NODE,
                 )
-                
+
         if RVIZ_HST:
             self._traj_marker_pub.publish(marker)
 
@@ -210,10 +213,6 @@ class HST_infer_node(Node):
         self._start_time = header.stamp
         logger.info(f"hst started at {self._start_time}")
 
-
-
-
-        
 
 
 def main(args=None):
