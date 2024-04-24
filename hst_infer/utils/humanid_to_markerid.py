@@ -11,7 +11,9 @@ class marker_id_offset(Enum):
     HUMAN_MARKER_ID_VOL = 10
 
     HST_NS = HST_INFER_NODE
-    HST_HUMAN_TRAJ = 0
+    HST_HUMAN_CURRENT_TRAJ = 0
+    HST_HUMAN_FUTURE_TRAJ = 1
+
     DEFAULT_OFFSET = 100            # we have 100 slots for special id
 
 

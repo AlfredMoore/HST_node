@@ -15,6 +15,7 @@ STRETCH_BASE_FRAME = "base_link"
 # rviz
 RVIZ_HST: bool = True
 RVIZ_HST_TOPIC = HST_INFER_NODE + "/vis/human_trajectory"
+CURRENT_COLOR = dict(r=1.0, g=0.5, b=0.5, a=1.0)
 
 # hst parameters
 WINDOW_LENGTH = 19
@@ -26,7 +27,7 @@ DIM_XYZ = 3
 MAX_AGENT_NUM = 12
 
 # yolo keypoints to hst keypoints
-KEYPOINT_INTERPOLATION = False
+KEYPOINT_INTERPOLATION = True
 
 # Human Scene Transformer
 NETWORK_PARAM_PATH: Path = SRC_PROJECT_PATH / "hst_net_param"

@@ -36,7 +36,7 @@ from hst_infer.data_buffer import skeleton_buffer
 from hst_infer.utils.logger import logger
 from hst_infer.utils.run_once import run_once
 from hst_infer.utils.transform import transformstamped_to_tr
-from hst_infer.utils.rviz2_marker import add_multihuman_pos_markers, delete_multihuman_pos_markers
+from hst_infer.utils.rviz2_marker import add_multihuman_future_pos_markers, add_multihuman_current_pos_markers, delete_multihuman_pos_markers
 from hst_infer.node_config import *
 from hst_infer.human_scene_transformer.model import model as hst_model
 from hst_infer.human_scene_transformer.config import hst_config
@@ -71,7 +71,7 @@ class HST_infer_node(Node):
         #  Publisher ######################################
         if RVIZ_HST:
             self._traj_marker_pub = self.create_publisher(
-                Marker, RVIZ_HST_TOPIC, 5
+                MarkerArray, RVIZ_HST_TOPIC, 5
             )
         # logger
         logger.info(
@@ -97,11 +97,14 @@ class HST_infer_node(Node):
         if len(current_human_id_set) == 0:
             # TODO: delete all rviz
             if RVIZ_HST:
-                marker = delete_multihuman_pos_markers(frame_id=STRETCH_BASE_FRAME,)
+                # logger.debug(f"Empty human set{current_human_id_set}")
+                markerarray = delete_multihuman_pos_markers(frame_id=STRETCH_BASE_FRAME,)
+                self._traj_marker_pub.publish(markerarray)
 
         else:
-            t, r = self.tf2_array_transformation(source_frame=CAMERA_FRAME, target_frame=STRETCH_BASE_FRAME)
+
             if msg.header.frame_id != STRETCH_BASE_FRAME:
+                t, r = self.tf2_array_transformation(source_frame=CAMERA_FRAME, target_frame=STRETCH_BASE_FRAME)
                 logger.warning(f"The frame {msg.header.frame_id} is not {STRETCH_BASE_FRAME}, please check the skeleton extractor")
                 try:
                     # np dot ##########
@@ -114,6 +117,7 @@ class HST_infer_node(Node):
                     # [3,3] @ [3,1] = [3,1] but einsum is slower
                     keypointATKD_stretch = np.einsum("ji,...i->...j", r, keypointATKD) + t
                     human_pos_ATD_stretch = np.einsum("ji,...i->...j", r, human_pos_ATD) + t
+            
             else:
                 human_pos_ATD_stretch = human_pos_ATD
                 keypointATKD_stretch = keypointATKD
@@ -124,9 +128,10 @@ class HST_infer_node(Node):
             # To HST tensor input
             agent_position = tf.convert_to_tensor(human_pos_ATD_stretch[np.newaxis,...,:2])     # 2D position
             agent_keypoint = tf.convert_to_tensor(
-                keypoints.human_keypoints.map_yolo_to_hst(keypoints_ATKD= keypointATKD_stretch,
-                                                        keypoint_mask_ATK= keypoint_mask_ATK,
-                                                        keypoint_center_ATD= human_pos_ATD_stretch,)
+                keypoints.human_keypoints.map_yolo_to_hst_batch(
+                    keypoints_ATKD= keypointATKD_stretch,
+                    keypoint_mask_ATK= keypoint_mask_ATK,
+                    keypoint_center_ATD= human_pos_ATD_stretch,)
             )
 
             # no agent orientation data
@@ -148,19 +153,24 @@ class HST_infer_node(Node):
 
             full_pred, output_batch = self.model(input_batch, training=False)
             agent_position_pred = full_pred['agents/position']
+            agent_position_logits = full_pred['mixture_logits']
             # logger.debug(f"{type(agent_position_pred)}, {agent_position_pred.shape}")
 
             try:
                 agent_position_pred = agent_position_pred.numpy()
+                agent_position_logits = np.squeeze(
+                    agent_position_logits.numpy()
+                )
             except:
                 logger.error(f"cannot convert agent position into numpy")
 
-            
-            # current_human_pred = agent_position_pred
-            # window_humanID_id2idx = self.skeleton_databuffer.id2idx_in_window
-            # window_humanID_list = self.skeleton_databuffer.humanID_in_window
+            assert agent_position_logits.shape == (PREDICTION_MODES_NUM,) ,"Incorrect prediction modes"
+            agent_position_prob = np.exp(agent_position_logits) / sum(np.exp(agent_position_logits))
+            logger.debug(f"{agent_position_prob}")
 
             if RVIZ_HST:
+                markers_list = list()
+
                 multi_human_pos_ATMD = np.squeeze(agent_position_pred, axis=0)       # remove batch 1
                 multi_human_mask_AT = np.any(keypoint_mask_ATK, axis=-1)
                 # logger.debug(f"{multi_human_pos_ATMD.shape}")
@@ -168,17 +178,30 @@ class HST_infer_node(Node):
                     f"human position shape {multi_human_pos_ATMD.shape} should be {(A,T,hst_config.hst_model_param.num_modes,99)}"
                 assert multi_human_mask_AT.shape == (A,T)
 
-                marker = add_multihuman_pos_markers(
-                    multi_human_pos_ATMD=multi_human_pos_ATMD,
-                    multi_human_mask_AT=multi_human_mask_AT,
-                    present_idx=HISTORY_LENGTH,
-                    frame_id=STRETCH_BASE_FRAME,
-                    ns=HST_INFER_NODE,
+                markers_list.append(
+                    add_multihuman_current_pos_markers(
+                        multi_human_history_pos_ATD=human_pos_ATD_stretch,
+                        multi_human_mask_AT=multi_human_mask_AT,
+                        present_idx=HISTORY_LENGTH,
+                        frame_id=STRETCH_BASE_FRAME,
+                        ns=HST_INFER_NODE,
+                    )
                 )
 
-        if RVIZ_HST:
-            self._traj_marker_pub.publish(marker)
+                markers_list.append(
+                    add_multihuman_future_pos_markers(
+                        multi_human_pos_ATMD=multi_human_pos_ATMD,
+                        multi_human_mask_AT=multi_human_mask_AT,
+                        modes_prob=agent_position_prob,
+                        present_idx=HISTORY_LENGTH,
+                        frame_id=STRETCH_BASE_FRAME,
+                        ns=HST_INFER_NODE,
+                        )
+                )
 
+                markerarray = MarkerArray()
+                markerarray.markers = markers_list
+                self._traj_marker_pub.publish(markerarray)
 
 
             # debug ###

@@ -14,10 +14,4 @@
         launch-prefix="$(find-pkg-prefix skeleton_extractor)/.venv/bin/python"
         output="screen"
     />
-
-    <node
-        pkg="rviz2"
-        exec="rviz2"
-        args="-d $(find-pkg-share hst_infer)/rviz2/hst_core.rviz"
-    />
 </launch>
