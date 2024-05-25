@@ -2,6 +2,8 @@ from enum import Enum
 
 from hst_infer.node_config import *
 
+import numpy as np
+
 # RViz Visualization (code errors)
 class marker_id_offset(Enum):
     SKELETON_NS = "skeleton"

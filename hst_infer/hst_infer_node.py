@@ -16,7 +16,6 @@ import rclpy.duration
 import rclpy.time
 from rclpy.node import Node
 # import message_filters
-# from rospy.numpy_msg import numpy_msg
 
 import tf2_ros
 from tf2_ros.buffer import Buffer
@@ -33,7 +32,7 @@ from cv_bridge import CvBridge
 
 # inference pipeline
 from hst_infer.data_buffer import skeleton_buffer
-from hst_infer.utils.logger import logger
+from hst_infer.utils.logger import logger, get_hst_infer_latency
 from hst_infer.utils.run_once import run_once
 from hst_infer.utils.transform import transformstamped_to_tr
 from hst_infer.utils.rviz2_marker import add_multihuman_future_pos_markers, add_multihuman_current_pos_markers, delete_multihuman_pos_markers
@@ -82,6 +81,9 @@ class HST_infer_node(Node):
             Tensorflow Eager Mode: {tf.executing_eagerly()} \
         ")
         
+        # counter
+        self.counter: int = 0
+
     
     def _skeleton_callback(self, msg: MultiHumanSkeleton):
 
@@ -122,6 +124,14 @@ class HST_infer_node(Node):
                 human_pos_ATD_stretch = human_pos_ATD
                 keypointATKD_stretch = keypointATKD
 
+            if EVALUATION_NODE:
+                # get human TF at the very first time
+                try:
+                    human_t = self._get_human_motion_capture_pose(HUMAN_FRAME, STRETCH_BASE_FRAME)
+                except:
+                    human_t = np.nan
+
+
             ### robot position
             robot_pos_TD = np.zeros((HISTORY_LENGTH, DIM_XYZ))
 
@@ -145,10 +155,12 @@ class HST_infer_node(Node):
             # agents/position: [B,A,T,2]
             # agents/orientation: [1,1,T,1] useless
             # robot/position: [B,T,3]
-            input_batch = {'agents/keypoints': agent_keypoint,
-                        'agents/position': agent_position,
-                        'agents/orientation': agent_orientation,
-                        'robot/position': robot_position,}
+            input_batch = {
+                'agents/keypoints': agent_keypoint,
+                'agents/position': agent_position,
+                'agents/orientation': agent_orientation,
+                'robot/position': robot_position,
+                }
             # logger.debug(f'shape:\n keypoints {agent_keypoint.shape}, position {agent_position.shape}, {robot_position.shape}')
 
             full_pred, output_batch = self.model(input_batch, training=False)
@@ -166,7 +178,7 @@ class HST_infer_node(Node):
 
             assert agent_position_logits.shape == (PREDICTION_MODES_NUM,) ,"Incorrect prediction modes"
             agent_position_prob = np.exp(agent_position_logits) / sum(np.exp(agent_position_logits))
-            logger.debug(f"{agent_position_prob}")
+            # logger.info(f"\nMode weights: {agent_position_prob}")
 
             if RVIZ_HST:
                 markers_list = list()
@@ -204,6 +216,24 @@ class HST_infer_node(Node):
                 self._traj_marker_pub.publish(markerarray)
 
 
+        if EVALUATION_NODE:
+            get_hst_infer_latency(self, msg)
+            # save pickles of skeletons, traj prediction, mocap
+            pickle_file_path = PICKLE_DIR_PATH / "evaluation_data.pkl"
+            data_to_save = {
+                "human_pos_ground_true_ATD": human_pos_ATD_stretch,
+                "human_pos_mask_AT": multi_human_mask_AT,
+                "human_pos_HST_ATMD": multi_human_pos_ATMD,
+                "HST_mode_weights": agent_position_prob,
+                "human_T": human_t
+            }
+            with open(pickle_file_path.as_posix(), 'ab') as pickle_hd:
+                pickle.dump(data_to_save, pickle_hd)
+                logger.success(f"Dump pickle at step {self.counter}")
+                self.counter += 1
+            # print("then pickle dump")
+            # get_hst_infer_latency(self, msg)
+            
             # debug ###
             # logger.debug(f"Buffer depth:{len(self.skeleton_databuffer)}\n")
             # logger.debug(f"\nget_image:{msg.header.stamp}\nreceive_skeleton:{t2}\nafter_databuffer:{self.get_clock().now()}")
@@ -216,9 +246,18 @@ class HST_infer_node(Node):
 
 
 
-    def tf2_array_transformation(self, source_frame: str, target_frame: str):
+    def tf2_array_transformation(self, source_frame: str, target_frame: str) -> tuple[np.ndarray, np.ndarray]:
+        """
+        return translation(3,), rotation(3,3)
+        """
         try:
-            # P^b = T_a^b @ P^a, T_a^b means b wrt a transformation
+            # P^b(target) = T_a^b @ P^a(source), T_a^b means T of a wrt b frame, ^super: wrt, _sub: processing
+            # fun lookup_transform is designated to convert the pose of an object from source frame to target frame
+            # so what we get is T_a^b, T of a wrt b, which is also the pose of a(source) relative to b(target)
+            
+            # NOTE: lookup_transfrom hint is not accurate, to clearify and simplify it
+            # target_frame = TransfromStamped.header.frame_id, source_frame = TransformStamped.child_frame_id
+            # in conclusion, return T and R of source_frame in target_frame
             transformation = self._tf_buffer.lookup_transform(target_frame=target_frame, 
                                                               source_frame=source_frame,
                                                               time=rclpy.time.Time(seconds=0, nanoseconds=0),
@@ -229,6 +268,15 @@ class HST_infer_node(Node):
 
         t,r = transformstamped_to_tr(transformation)
         return t,r
+
+
+    def _get_human_motion_capture_pose(self, source_frame: str = HUMAN_FRAME, target_frame: str = STRETCH_BASE_FRAME) -> np.ndarray:
+        """
+        (default) return translation of motion capture w.r.t robot
+        """
+        t, r = self.tf2_array_transformation(source_frame=source_frame, target_frame=target_frame)
+        return t
+
 
 
     @run_once

@@ -11,7 +11,7 @@ from geometry_msgs.msg import PoseArray, Pose, Quaternion, Point, PointStamped, 
 
 def transform_to_tr(tf: Transform) -> tuple[np.ndarray, np.ndarray]:
     """
-    return translation(3,), rotation(3,3)
+    return np.ndarray translation(3,), rotation(3,3)
     """
     t = np.array([tf.translation.x, tf.translation.y, tf.translation.z])
     q = np.array([tf.rotation.x, tf.rotation.y,
@@ -25,6 +25,6 @@ def transform_to_tr(tf: Transform) -> tuple[np.ndarray, np.ndarray]:
 
 def transformstamped_to_tr(tfstamped: TransformStamped) -> tuple[np.ndarray, np.ndarray]:
     """
-    return translation(3,), rotation(3,3)
+    return np.ndarray translation(3,), rotation(3,3)
     """
     return transform_to_tr(tfstamped.transform)

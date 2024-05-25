@@ -32,3 +32,11 @@ KEYPOINT_INTERPOLATION = True
 # Human Scene Transformer
 NETWORK_PARAM_PATH: Path = SRC_PROJECT_PATH / "hst_net_param"
 HST_CKPT_PATH: Path = NETWORK_PARAM_PATH / "ckpts/ckpt-30"
+
+# Evaluation
+EVALUATION_NODE: bool = True
+PICKLE_DIR_PATH: Path = SRC_PROJECT_PATH / "pickle"
+
+## Motion Capture
+MOTION_CAPTURE_TF: bool = False
+HUMAN_FRAME: str = "human"
